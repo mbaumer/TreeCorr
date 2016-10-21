@@ -1,4 +1,4 @@
-/* Copyright (c) 2003-2014 by Mike Jarvis
+/* Copyright (c) 2003-2015 by Mike Jarvis
  *
  * TreeCorr is free software: redistribution and use in source and binary forms,
  * with or without modification, are permitted provided that the following
@@ -11,8 +11,9 @@
  *    this list of conditions, and the disclaimer given in the documentation
  *    and/or other materials provided with the distribution.
  */
-#ifndef Process2_H
-#define Process2_H
+
+#ifndef TreeCorr_Process2_H
+#define TreeCorr_Process2_H
 
 template <class DataType, class CellType1, class CellType2>
 void Process11(
@@ -20,8 +21,10 @@ void Process11(
     double minrsq, double maxrsq,
     const CellType1& c1, const CellType2& c2)
 {
-    const double dsq = DistSq(c1.getMeanPos(),c2.getMeanPos());
-    const double s1ps2 = c1.getAllSize()+c2.getAllSize();
+    double s1 = c1.getAllSize();
+    double s2 = c2.getAllSize();
+    const double dsq = DistSq(c1.getMeanPos(),c2.getMeanPos(),s1,s2);
+    const double s1ps2 = s1+s2;
 
     if (dsq < minrsq) if (sqrt(dsq)+s1ps2 < minr) return;
     if (dsq > maxrsq) if (sqrt(dsq)-s1ps2 > maxr) return;

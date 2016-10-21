@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2014 by Mike Jarvis
+# Copyright (c) 2003-2015 by Mike Jarvis
 #
 # TreeCorr is free software: redistribution and use in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -11,13 +11,13 @@
 #    this list of conditions, and the disclaimer given in the documentation
 #    and/or other materials provided with the distribution.
 
-
+from __future__ import print_function
 import numpy
 import treecorr
 import os
 from numpy import pi
 
-from test_helper import get_aardvark
+from test_helper import get_from_wiki
 
 def test_ascii():
 
@@ -25,8 +25,10 @@ def test_ascii():
     numpy.random.seed(8675309)
     x = numpy.random.random_sample(nobj)
     y = numpy.random.random_sample(nobj)
+    z = numpy.random.random_sample(nobj)
     ra = numpy.random.random_sample(nobj)
     dec = numpy.random.random_sample(nobj)
+    r = numpy.random.random_sample(nobj)
     w = numpy.random.random_sample(nobj)
     g1 = numpy.random.random_sample(nobj)
     g2 = numpy.random.random_sample(nobj)
@@ -40,14 +42,16 @@ def test_ascii():
     file_name = os.path.join('data','test.dat')
     with open(file_name, 'w') as fid:
         # These are intentionally in a different order from the order we parse them.
-        fid.write('# ra,dec,x,y,k,g1,g2,w,flag\n')
+        fid.write('# ra,dec,x,y,k,g1,g2,w,flag,z,r\n')
         for i in range(nobj):
-            fid.write((('%.8f '*8)+'%d\n')%(ra[i],dec[i],x[i],y[i],k[i],g1[i],g2[i],w[i],flags[i]))
+            fid.write((('%.8f '*10)+'%d\n')%(
+                ra[i],dec[i],x[i],y[i],k[i],g1[i],g2[i],w[i],z[i],r[i],flags[i]))
 
     # Check basic input
     config = {
         'x_col' : 3,
         'y_col' : 4,
+        'z_col' : 9,
         'x_units' : 'rad',
         'y_units' : 'rad',
         'w_col' : 8,
@@ -58,13 +62,14 @@ def test_ascii():
     cat1 = treecorr.Catalog(file_name, config)
     numpy.testing.assert_almost_equal(cat1.x, x)
     numpy.testing.assert_almost_equal(cat1.y, y)
+    numpy.testing.assert_almost_equal(cat1.z, z)
     numpy.testing.assert_almost_equal(cat1.w, w)
     numpy.testing.assert_almost_equal(cat1.g1, g1)
     numpy.testing.assert_almost_equal(cat1.g2, g2)
     numpy.testing.assert_almost_equal(cat1.k, k)
 
     # Check flags
-    config['flag_col'] = 9
+    config['flag_col'] = 11
     cat2 = treecorr.Catalog(file_name, config)
     numpy.testing.assert_almost_equal(cat2.w[flags==0], w[flags==0])
     numpy.testing.assert_almost_equal(cat2.w[flags!=0], 0.)
@@ -72,7 +77,7 @@ def test_ascii():
     # Check ok_flag
     config['ok_flag'] = 4
     cat3 = treecorr.Catalog(file_name, config)
-    numpy.testing.assert_almost_equal(cat3.w[numpy.logical_or(flags==0, flags==4)], 
+    numpy.testing.assert_almost_equal(cat3.w[numpy.logical_or(flags==0, flags==4)],
                                       w[numpy.logical_or(flags==0, flags==4)])
     numpy.testing.assert_almost_equal(cat3.w[numpy.logical_and(flags!=0, flags!=4)], 0.)
 
@@ -86,6 +91,7 @@ def test_ascii():
     # Check different units for x,y
     config['x_units'] = 'arcsec'
     config['y_units'] = 'arcsec'
+    del config['z_col']
     cat5 = treecorr.Catalog(file_name, config)
     numpy.testing.assert_almost_equal(cat5.x, x * (pi/180./3600.))
     numpy.testing.assert_almost_equal(cat5.y, y * (pi/180./3600.))
@@ -113,6 +119,7 @@ def test_ascii():
     del config['y_col']
     config['ra_col'] = 1
     config['dec_col'] = 2
+    config['r_col'] = 10
     config['ra_units'] = 'rad'
     config['dec_units'] = 'rad'
     cat6 = treecorr.Catalog(file_name, config)
@@ -141,7 +148,8 @@ def test_ascii():
         fid.write('% And we use a weird comment marker to boot.')
         fid.write('% ra,dec,x,y,k,g1,g2,w,flag\n')
         for i in range(nobj):
-            fid.write((('%.8f,'*8)+'%d\n')%(ra[i],dec[i],x[i],y[i],k[i],g1[i],g2[i],w[i],flags[i]))
+            fid.write((('%.8f,'*10)+'%d\n')%(
+                ra[i],dec[i],x[i],y[i],k[i],g1[i],g2[i],w[i],z[i],r[i],flags[i]))
             if i%100 == 0:
                 fid.write('%%%% Line %d\n'%i)
     config['delimiter'] = ','
@@ -149,6 +157,7 @@ def test_ascii():
     cat7 = treecorr.Catalog(csv_file_name, config)
     numpy.testing.assert_almost_equal(cat7.ra, ra * (pi/12.))
     numpy.testing.assert_almost_equal(cat7.dec, dec * (pi/180.))
+    numpy.testing.assert_almost_equal(cat7.r, r)
     numpy.testing.assert_almost_equal(cat7.g1, g1)
     numpy.testing.assert_almost_equal(cat7.g2, g2)
     numpy.testing.assert_almost_equal(cat7.w[flags < 16], w[flags < 16])
@@ -179,12 +188,10 @@ def test_ascii():
     numpy.testing.assert_almost_equal(cat8.g2, g2)
 
 
- 
 def test_fits():
-    get_aardvark()
-
+    get_from_wiki('Aardvark.fit')
     file_name = os.path.join('data','Aardvark.fit')
-    config = treecorr.read_config('Aardvark.params')
+    config = treecorr.read_config('Aardvark.yaml')
 
     # Just test a few random particular values
     cat1 = treecorr.Catalog(file_name, config)
@@ -216,7 +223,10 @@ def test_fits():
     config['last_row'] = 50000
     cat3 = treecorr.Catalog(file_name, config)
     numpy.testing.assert_equal(len(cat3.x), 49900)
+    numpy.testing.assert_equal(cat3.ntot, 49900)
     numpy.testing.assert_equal(cat3.nobj, sum(cat3.w != 0))
+    numpy.testing.assert_equal(cat3.sumw, sum(cat3.w))
+    numpy.testing.assert_equal(cat3.sumw, sum(cat2.w[100:50000]))
     numpy.testing.assert_almost_equal(cat3.g1[46292], 0.0005066675)
     numpy.testing.assert_almost_equal(cat3.g2[46292], -0.0001006742)
     numpy.testing.assert_almost_equal(cat3.k[46292], -0.0008628797)
@@ -278,13 +288,13 @@ def test_contiguous():
                             g2=source_data['g2'])
     cat2_float = treecorr.Catalog(ra=source_data['ra'].astype(float), ra_units='deg',
                                   dec=source_data['dec'].astype(float), dec_units='deg',
-                                  g1=source_data['g1'].astype(float), 
+                                  g1=source_data['g1'].astype(float),
                                   g2=source_data['g2'].astype(float))
 
-    print "dtypes of original arrays: ", [source_data[key].dtype for key in ['ra','dec','g1','g2']]
-    print "dtypes of cat2 arrays: ", [getattr(cat2,key).dtype for key in ['ra','dec','g1','g2']]
-    print "is original g2 array contiguous?", source_data['g2'].flags['C_CONTIGUOUS']
-    print "is cat2.g2 array contiguous?", cat2.g2.flags['C_CONTIGUOUS']
+    print("dtypes of original arrays: ", [source_data[key].dtype for key in ['ra','dec','g1','g2']])
+    print("dtypes of cat2 arrays: ", [getattr(cat2,key).dtype for key in ['ra','dec','g1','g2']])
+    print("is original g2 array contiguous?", source_data['g2'].flags['C_CONTIGUOUS'])
+    print("is cat2.g2 array contiguous?", cat2.g2.flags['C_CONTIGUOUS'])
     assert not source_data['g2'].flags['C_CONTIGUOUS']
     assert cat2.g2.flags['C_CONTIGUOUS']
 
@@ -377,6 +387,68 @@ def test_list():
         numpy.testing.assert_almost_equal(cats[k].x, x_list[k])
         numpy.testing.assert_almost_equal(cats[k].y, y_list[k])
 
+def test_write():
+    # Test that writing a Catalog to a file and then reading it back in works correctly
+    ngal = 20000
+    s = 10.
+    numpy.random.seed(8675309)
+    x = numpy.random.normal(222,50, (ngal,) )
+    y = numpy.random.normal(138,20, (ngal,) )
+    z = numpy.random.normal(912,130, (ngal,) )
+    w = numpy.random.normal(1.3, 0.1, (ngal,) )
+
+    ra = numpy.random.normal(11.34, 0.9, (ngal,) )
+    dec = numpy.random.normal(-48.12, 4.3, (ngal,) )
+    r = numpy.random.normal(1024, 230, (ngal,) )
+
+    k = numpy.random.normal(0,s, (ngal,) )
+    g1 = numpy.random.normal(0,s, (ngal,) )
+    g2 = numpy.random.normal(0,s, (ngal,) )
+
+    cat1 = treecorr.Catalog(x=x, y=y, z=z)
+    cat2 = treecorr.Catalog(ra=ra, dec=dec, r=r, ra_units='hour', dec_units='deg',
+                            w=w, g1=g1, g2=g2, k=k)
+
+    # Test ASCII output
+    cat1.write(os.path.join('output','cat1.dat'))
+    cat1_asc = treecorr.Catalog(os.path.join('output','cat1.dat'), file_type='ASCII',
+                                x_col=1, y_col=2, z_col=3)
+    numpy.testing.assert_almost_equal(cat1_asc.x, x)
+    numpy.testing.assert_almost_equal(cat1_asc.y, y)
+    numpy.testing.assert_almost_equal(cat1_asc.z, z)
+
+    cat2.write(os.path.join('output','cat2.dat'), file_type='ASCII')
+    cat2_asc = treecorr.Catalog(os.path.join('output','cat2.dat'), ra_col=1, dec_col=2,
+                                r_col=3, w_col=4, g1_col=5, g2_col=6, k_col=7,
+                                ra_units='rad', dec_units='rad')
+    numpy.testing.assert_almost_equal(cat2_asc.ra, ra)
+    numpy.testing.assert_almost_equal(cat2_asc.dec, dec)
+    numpy.testing.assert_almost_equal(cat2_asc.r, r)
+    numpy.testing.assert_almost_equal(cat2_asc.w, w)
+    numpy.testing.assert_almost_equal(cat2_asc.g1, g1)
+    numpy.testing.assert_almost_equal(cat2_asc.g2, g2)
+    numpy.testing.assert_almost_equal(cat2_asc.k, k)
+
+    # Test FITS output
+    cat1.write(os.path.join('output','cat1.fits'), file_type='FITS')
+    cat1_fits = treecorr.Catalog(os.path.join('output','cat1.fits'),
+                                 x_col='x', y_col='y', z_col='z')
+    numpy.testing.assert_almost_equal(cat1_fits.x, x)
+    numpy.testing.assert_almost_equal(cat1_fits.y, y)
+    numpy.testing.assert_almost_equal(cat1_fits.z, z)
+
+    cat2.write(os.path.join('output','cat2.fits'))
+    cat2_fits = treecorr.Catalog(os.path.join('output','cat2.fits'), ra_col='ra', dec_col='dec',
+                                 r_col='r', w_col='w', g1_col='g1', g2_col='g2', k_col='k',
+                                 ra_units='rad', dec_units='rad', file_type='FITS')
+    numpy.testing.assert_almost_equal(cat2_fits.ra, ra)
+    numpy.testing.assert_almost_equal(cat2_fits.dec, dec)
+    numpy.testing.assert_almost_equal(cat2_fits.r, r)
+    numpy.testing.assert_almost_equal(cat2_fits.w, w)
+    numpy.testing.assert_almost_equal(cat2_fits.g1, g1)
+    numpy.testing.assert_almost_equal(cat2_fits.g2, g2)
+    numpy.testing.assert_almost_equal(cat2_fits.k, k)
+
 
 if __name__ == '__main__':
     test_ascii()
@@ -384,3 +456,4 @@ if __name__ == '__main__':
     test_direct()
     test_contiguous()
     test_list()
+    test_write()

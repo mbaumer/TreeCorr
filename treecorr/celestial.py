@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2014 by Mike Jarvis
+# Copyright (c) 2003-2015 by Mike Jarvis
 #
 # TreeCorr is free software: redistribution and use in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -15,6 +15,9 @@
 # of it there, I can republish it here under the TreeCorr license too.  I've
 # made a few (slight) modifications from the GalSim version.
 
+"""
+.. module:: celestial
+"""
 
 angle_units = {
     'arcsec' : 4.84813681109537e-6,
@@ -46,6 +49,10 @@ class CelestialCoord(object):
     This class is used to perform various calculations in spherical coordinates, such
     as the angular distance between two points in the sky, the angles in spherical triangles,
     projecting from sky coordinates onto a Euclidean tangent plane, etc.
+    None of these calculations are used directly by TreeCorr, but the projection routines
+    were useful when developing code for working directly in spherical coordinates, and it
+    could still be useful for people who need to massage their input catalogs before passing
+    them to TreeCorr.
 
     A `CelestialCoord` object is constructed from the right ascension and declination:
 
@@ -83,6 +90,23 @@ class CelestialCoord(object):
     @property
     def dec(self): return self._dec
 
+    @staticmethod
+    def radec_to_xyz(ra, dec, r=1.):
+        "Convert ra, dec (in radians) to 3D x,y,z coordinates on the unit sphere."
+        import numpy
+        cosdec = numpy.cos(dec)
+        x = cosdec * numpy.cos(ra) * r
+        y = cosdec * numpy.sin(ra) * r
+        z = numpy.sin(dec) * r
+        return x,y,z
+
+    @staticmethod
+    def xyz_to_radec(x, y, z):
+        "Convert 3D x,y,z coordinates to ra, dec (in radians)."
+        import numpy
+        ra = numpy.arctan2(y,x)
+        dec = numpy.arctan2(z,numpy.sqrt(x**2+y**2))
+        return ra,dec
 
     def _set_aux(self):
         if self._x is None:
@@ -101,6 +125,7 @@ class CelestialCoord(object):
         The return value is in radians.
 
         :param other:   Another `CelestialCoord` object.
+
         :returns:       The great circle distance in radians between this coord and `other`.
         """
         # The easiest way to do this in a way that is stable for small separations
@@ -138,6 +163,7 @@ class CelestialCoord(object):
 
         :param coord1:  Another `CelestialCoord` object.
         :param coord2:  A third `CelestialCoord` object.
+
         :returns:       The angle in radians between the great circles to the two other coords.
         """
         # Call A = coord1, B = coord2, C = self
@@ -175,6 +201,7 @@ class CelestialCoord(object):
 
         :param coord1:  Another `CelestialCoord` object.
         :param coord2:  A third `CelestialCoord` object.
+
         :returns:       The area in steradians of the spherical triangle defined by the three
                         coords.
         """
@@ -254,6 +281,7 @@ class CelestialCoord(object):
 
         :param other:       The coordinate to be projected relative to the current coord.
         :param projection:  Which kind of projection to use. (default: 'lambert')
+
         :returns:           The projected position (u,v) in radians as a tuple.
         """
         if projection not in [ 'lambert', 'stereographic', 'gnomonic', 'postel' ]:
@@ -328,6 +356,7 @@ class CelestialCoord(object):
         :param ra:          The RA of the coordinate to be projected relative to the current coord.
         :param dec:         The Dec of the coordinate to be projected relative to the current coord.
         :param projection:  Which kind of projection to use. (default: 'lambert')
+
         :returns:           The projected position (u,v) in radians as a tuple.
         """
         if projection not in [ 'lambert', 'stereographic', 'gnomonic', 'postel' ]:
@@ -357,6 +386,7 @@ class CelestialCoord(object):
         :param u:           The projected u value to be deprojected.
         :param v:           The projected v value to be deprojected.
         :param projection:  Which kind of projection to use. (default: 'lambert')
+
         :returns:           The `CelestialCoord` corresponding to the given projected position.
         """
         if projection not in [ 'lambert', 'stereographic', 'gnomonic', 'postel' ]:
@@ -443,6 +473,7 @@ class CelestialCoord(object):
         :param u:           The projected u value to be deprojected.
         :param v:           The projected v value to be deprojected.
         :param projection:  Which kind of projection to use. (default: 'lambert')
+
         :returns:           A tuple (ra, dec) of the deprojected coordinates.
         """
         if projection not in [ 'lambert', 'stereographic', 'gnomonic', 'postel' ]:
@@ -465,6 +496,7 @@ class CelestialCoord(object):
         :param u:           The projected u value to be deprojected.
         :param v:           The projected v value to be deprojected.
         :param projection:  Which kind of projection to use. (default: 'lambert')
+
         :returns:           The matrix as a tuple (J00, J01, J10, J11)
         """
         if projection not in [ 'lambert', 'stereographic', 'gnomonic', 'postel' ]:
@@ -547,6 +579,7 @@ class CelestialCoord(object):
 
         :param from_epoch:  The epoch to use for the current coord.
         :param to_epoch:    The new epoch to precess to.
+
         :returns:           A new `CelestialCoord` of the coordinates in the new epoch.
         """
         if from_epoch == to_epoch: return self
@@ -604,6 +637,7 @@ class CelestialCoord(object):
         by default, but you may also specify a different value with the epoch parameter.
 
         :param epoch:   The epoch to assume for the current coordinates (default: 2000)
+
         :returns:       The longitude and latitude as a tuple (el, b) in radians.
         """
         # cf. Lang, Astrophysical Formulae, page 13
@@ -642,6 +676,7 @@ class CelestialCoord(object):
         and the output ecliptic coordinates.
 
         :param epoch:   The epoch to assume for the coordinates (default: 2000).
+
         :returns:       The longitude and latitude as a tuple (lambda, beta) in radians.
         """
         import math

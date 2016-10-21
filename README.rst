@@ -1,5 +1,11 @@
+.. image:: https://travis-ci.org/rmjarvis/TreeCorr.svg?branch=master
+        :target: https://travis-ci.org/rmjarvis/TreeCorr
+.. image:: https://codecov.io/gh/rmjarvis/TreeCorr/branch/master/graph/badge.svg
+        :target: https://codecov.io/gh/rmjarvis/TreeCorr
 
-TreeCorr is a package for efficiently computing 2-point correlation functions.
+
+TreeCorr is a package for efficiently computing 2-point and 3-point correlation
+functions.
 
 - The code is hosted at https://github.com/rmjarvis/TreeCorr
 - It can compute correlations of regular number counts, weak lensing shears, or
@@ -7,26 +13,34 @@ TreeCorr is a package for efficiently computing 2-point correlation functions.
 - 2-point correlations may be auto-correlations or cross-correlations.  This
   includes shear-shear, count-shear, count-count, kappa-kappa, etc.  (Any
   combination of shear, kappa, and counts.)
-- 2-point functions can be done with correct curved-sky calculation using
-  RA, Dec coordinates, on a Euclidean tangent plane, or in 3D using RA, Dec
-  and a distance.
+- 3-point correlations currently can only be auto-correlations.  This includes
+  shear-shear-shear, count-count-count, and kappa-kappa-kappa.  The cross
+  varieties are planned to be added in the near future.
+- Both 2- and 3-point functions can be done with the correct curved-sky 
+  calculation using RA, Dec coordinates, on a Euclidean tangent plane, or in
+  3D using either (RA,Dec,r) or (x,y,z) positions.
 - The front end is in Python, which can be used as a Python module or as a 
-  standalone executable using configuration files.
+  standalone executable using configuration files. (The executable is corr2
+  for 2-point and corr3 for 3-point.)
 - The actual computation of the correlation functions is done in C++ using ball
-  trees (similar to kd trees), which make the calculation extremely
-  efficient.
+  trees (similar to kd trees), which make the calculation extremely efficient.
 - When available, OpenMP is used to run in parallel on multi-core machines.
 - Approximate running time for 2-point shear-shear is ~30 sec * (N/10^6) / core
-  for a bin size of 0.1 in log(r).  It scales as b^(-2).  This is the slowest
-  of the various kinds of correlations, so others will be a bit faster, but
-  with the same scaling with N and b.
-- 3-point functions have not yet been migrated to the new API, but they should
-  be available soon.
+  for a bin size b=0.1 in log(r).  It scales as b^(-2).  This is the slowest
+  of the various kinds of 2-point correlations, so others will be a bit faster,
+  but with the same scaling with N and b.
+- The running time for 3-point functions are highly variable depending on the 
+  range of triangle geometries you are calculating.  They are significantly
+  slower than the 2-point functions, but many orders of magnitude faster than
+  brute force algorithms.
 - Reference: Jarvis, Bernstein, & Jain, 2004, MNRAS, 352, 338
+  (I'm working on new paper about TreeCorr, including some of the improvements
+  I've made since then, but this will suffice as a reference for now.)
+- Record on the Astrophyics Source Code Library: http://ascl.net/1508.007
 
 The code is licensed under a FreeBSD license.  Essentially, you can use the 
 code in any way you want, but if you distribute it, you need to include the 
-file `TreeCorr_LICENSE` with the distribution.  See that file for details.
+file ``TreeCorr_LICENSE`` with the distribution.  See that file for details.
 
 
 Installation
@@ -44,12 +58,18 @@ released version, you should do::
 To install TreeCorr on a system where you do not have sudo privileges,
 you can do::
 
-    pip install TreeCorr --install-option="--prefix=~"
+    pip install TreeCorr --user
 
-NB: There is also a `--user` option with `pip install`, which installs into
-~/.local.  This is fine for the python module, but it puts the `corr2`
-executable into ~/.local/bin, which is probably not in your path.  The above
-command will instead install `corr2` into ~/bin.
+This installs the Python module into ``~/.local/lib/python2.7/site-packages``,
+which is normally already in your PYTHONPATH, but it puts the executables
+``corr2`` and ``corr3`` into ``~/.local/bin`` which is probably not in your PATH.
+To use these scripts, you should add this directory to your PATH.  If you would
+rather install into a different prefix rather than ~/.local, you can use::
+
+    pip install TreeCorr --install-option="--prefix=PREFIX"
+
+This would install the executables into ``PREFIX/bin`` and the Python module
+into ``PREFIX/lib/python2.7/site-packages``.
 
 
 If you would rather download the tarball and install TreeCorr yourself,
@@ -60,44 +80,50 @@ that is also relatively straightforward:
    interested, the dependencies are:
 
     - numpy
-    - fitsio: for reading/writing FITS files
-    - pandas: for reading/writing ASCII files. This package significantly
-      speeds up the reading of ASCII input catalogs over the numpy functions
-      loadtxt or genfromtxt.
+    - future
+    - fitsio: TreeCorr can use either fitsio or pyfits (now part of astropy),
+      so it will only install fitsio if none of these are present on your
+      system.
+    - pandas: This package significantly speeds up the reading of ASCII
+      input catalogs over the numpy functions loadtxt or genfromtxt.
+      However, if you don't have pandas installed, TreeCorr will fall back
+      to using the slower numpy.genfromtxt.
 
-2. Download the zip file or tarball of the current code from:
+2. Download the zip file or tarball for the latest release from:
 
-   https://github.com/rmjarvis/TreeCorr/releases/tag/v3.1.0
+   https://github.com/rmjarvis/TreeCorr/releases/
 
 3. Unzip the archive with either of the following (depending on which kind
    of archive you downloaded)::
 
-        unzip TreeCorr-3.1.0.zip
-        tar xvzf TreeCorr-3.1.0.tar.gz
+        unzip TreeCorr-3.4.0.zip
+        tar xvzf TreeCorr-3.4.0.tar.gz
 
-   It will unzip into the directory TreeCorr-3.1.0. Change to that directory::
+   It will unzip into the directory TreeCorr-3.4.0. Change to that directory::
 
-        cd TreeCorr-3.1.0
+        cd TreeCorr-3.4.0
 
 4. Install with the normal setup.py options.  Typically this would be the
    command::
 
-        python setup.py install --prefix=/your/home/directory
+        python setup.py install --prefix=~
 
-   This will install the executable `corr2` at::
+   This will install the executable ``corr2`` at::
 
         /your/home/directory/bin/corr2
 
-   It will also install the Python module called treecorr which you can use
+   It will also install the Python module called ``treecorr`` which you can use
    from within Python.
 
    .. note::
 
         There is a bug with numpy that it sometimes doesn't install correctly
         when included as a setup.py dependency:
+
             https://github.com/numpy/numpy/issues/1458  
-        The bug was marked closed in 2012, but I've gotten it with the latest
-        numpy version 1.8.2.  Installation failed with a traceback that ended
+
+        The bug was marked closed in 2012, but I've gotten it with numpy
+        versions since then. Installation failed with a traceback that ended
         with::
 
             File "/private/tmp/easy_install-xl4gri/numpy-1.8.2/numpy/core/setup.py", line 631, in configuration
@@ -118,9 +144,6 @@ that is also relatively straightforward:
         cd tests
         nosetests
 
-   They do take a bit of time to run, since I use around 1 million galaxies
-   for many of the tests.  On the order of 5-10 minutes when using a single
-   core, or less when OpenMP is enabled.
 
 
 Two-point Correlations
@@ -128,34 +151,51 @@ Two-point Correlations
 
 This software is able to compute several varieties of two-point correlations:
 
-:NN:  the normal two point correlation function of things like 2dF that
-      correlate the galaxy counts at each position.
+:NN:  The normal two-point correlation function of number counts (typically
+      galaxy counts).
 
-:NG:  correlation of counts with shear.  This is what is often called
+:GG:  Two-point shear-shear correlation function.
+
+:KK:  Nominally the two-point kappa-kappa correlation function, although any
+      scalar quantity can be used as "kappa".  In lensing, kappa is the 
+      convergence, but this could be used for temperature, size, etc.
+
+:NG:  Cross-correlation of counts with shear.  This is what is often called
       galaxy-galaxy lensing.
 
-:GG:  two-point shear correlation function.
+:NK:  Cross-correlation of counts with kappa.  Again, "kappa here can be any scalar
+      quantity.
 
-:NK:  correlation of counts with kappa.  While kappa is nominally the lensing
-      convergence, it could really be any scalar quantity, like temperature,
-      size, etc.
-
-:KG:  correlation of convergence with shear.  Like the NG calculation, but 
-      weighting the pairs by the convergence values the foreground points.
-
-:KK:  two-point kappa correlation function.
+:KG:  Cross-correlation of convergence with shear.  Like the NG calculation, but 
+      weighting the pairs by the kappa values the foreground points.
 
 
-Running corr2
--------------
+Three-point Correlations
+------------------------
 
-The executable corr2 takes one required command-line argument, which is the 
-name of a configuration file::
+This software is currently only able to compute three-point auto-correlations:
+
+:NNN: Three-point correlation function of number counts.
+
+:GGG: Three-point shear correlation function.  We use the "natural components"
+      called Gamma, described by Schneider & Lombardi [Astron.Astrophys. 397
+      (2003) 809-818] using the triangle centroid as the reference point.
+
+:KKK: Three-point kappa correlation function.  Again, "kappa" here can be any
+      scalar quantity.
+
+
+Running corr2 and corr3
+-----------------------
+
+The executables corr2 and corr3 each take one required command-line argument,
+which is the name of a configuration file::
 
     corr2 config_file
+    corr3 config_file
 
-A sample configuration file is provided, called sample.params.  See the
-TreeCorr wiki page
+A sample configuration file for corr2 is provided, called sample.params.  
+See the TreeCorr wiki page
 
 https://github.com/rmjarvis/TreeCorr/wiki/Configuration-Parameters
 
@@ -175,8 +215,42 @@ files.
 Using the Python module
 -----------------------
 
-The same functionality can be achieved from within Python using a Python dict
-for the configuration parameters::
+Here we only give a quick overview.  Full Sphinx-generated documentation can
+be found at:
+
+http://rmjarvis.github.io/TreeCorr/html/index.html
+
+The TreeCorr module is called ``treecorr`` in Python.  Typical usage for
+computing the shear-shear correlation function looks something like the
+following::
+
+    >>> import treecorr
+    >>> cat = treecorr.Catalog('cat.fits', ra_col='RA', dec_col='DEC',
+    ...                        ra_units='degrees', dec_units='degrees',
+    ...                        g1_col='GAMMA1', g2_col='GAMMA2')
+    >>> gg = treecorr.GGCorrelation(min_sep=1., max_sep=100., bin_size=0.1,
+    ...                             sep_units='arcmin')
+    >>> gg.process(cat)
+    >>> xip = gg.xip  # The xi_plus correlation function
+    >>> xim = gg.xim  # The xi_minus correlation function
+
+The different correlation functions each have their own class.  You can 
+access the Python documentation by calling help on the appropriate class
+to get more details about the different kwarg options, attributes, and 
+methods for each::
+
+    >>> help(NNCorrelation)
+    >>> help(GGCorrelation)
+    >>> help(KKCorrelation)
+    >>> help(NGCorrelation)
+    >>> help(NKCorrelation)
+    >>> help(KGCorrelation)
+    >>> help(NNNCorrelation)
+    >>> help(GGGCorrelation)
+    >>> help(KKKCorrelation)
+
+You can also leverage the configuration file apparatus from within Python
+using a Python dict for the configuration parameters::
 
     >>> import treecorr
     >>> config = treecorr.read_config(config_file)
@@ -189,13 +263,9 @@ for the configuration parameters::
 
 However, the Python module gives you much more flexibility in how to specify
 the input and output, including going directly from and to numpy arrays within
-Python.  For more information, see the wiki page:
+Python.  For a slightly longer "Getting Started" guide see the wiki page:
 
 https://github.com/rmjarvis/TreeCorr/wiki/Guide-to-using-TreeCorr-in-Python
-
-Sphinx documentation based on the doc strings can be found at:
-
-http://rmjarvis.github.io/TreeCorr/html/index.html
 
 
 Reporting bugs

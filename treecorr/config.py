@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2014 by Mike Jarvis
+# Copyright (c) 2003-2015 by Mike Jarvis
 #
 # TreeCorr is free software: redistribution and use in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -11,7 +11,14 @@
 #    this list of conditions, and the disclaimer given in the documentation
 #    and/or other materials provided with the distribution.
 
+"""
+.. module:: config
+"""
+
+from __future__ import print_function
 import treecorr
+import future.utils
+
 
 def parse_variable(config, v):
     """Parse a configuration variable from a string that should look like 'key = value'
@@ -27,14 +34,17 @@ def parse_variable(config, v):
     # Cut off any trailing comment
     if '#' in value: value = value.split('#')[0]
     value = value.strip()
-    if value[0] == '{':
+    if value[0] in ['{','[','(']:
+        if value[-1] not in ['}',']',')']:
+            raise ValueError('List symbol %s not properly matched'%value[0])
         values = value[1:-1].split(',')
+        values = [ v.strip() for v in values ]
     else:
         values = value.split() # on whitespace
-        if len(values) == 1:
-            config[key] = value
-        else:
-            config[key] = values
+    if len(values) == 1:
+        config[key] = values[0]
+    else:
+        config[key] = values
 
 
 def parse_bool(value):
@@ -74,7 +84,7 @@ def parse_unit(value):
 
     The value is allowed to merely start with one of the unit names.  So 'deg', 'degree',
     'degrees' all convert to 'deg' which is the key in the angle_units dict.
-    The return value in this case would be treecorr.angle_units['deg'], which has the 
+    The return value in this case would be treecorr.angle_units['deg'], which has the
     value pi/180.
 
     :param value:   The unit as a string value to parse.
@@ -86,11 +96,43 @@ def parse_unit(value):
     raise ValueError("Unable to parse %s as an angle unit"%value)
 
 
-def read_config(file_name):
+def read_config(file_name, file_type='auto'):
     """Read a configuration dict from a file.
 
     :param file_name:   The file name from which the configuration dict should be read.
+    :param file_type:   The type of config file.  Options are 'auto', 'yaml', 'json', 'params'.
+                        (default: 'auto', which tries to determine the type from the extension)
+
+    :returns:           A config dict built from the configuration file.
     """
+    if file_type == 'auto':
+        if file_name.endswith('.yaml'): file_type = 'yaml'
+        elif file_name.endswith('.json'): file_type = 'json'
+        elif file_name.endswith('.params'): file_type = 'params'
+        else:
+            raise ValueError("Unable to determine the type of config file from the extension")
+    if file_type == 'yaml':
+        return read_yaml_file(file_name)
+    elif file_type == 'json':
+        return read_json_file(file_name)
+    elif file_type == 'params':
+        return read_params_file(file_name)
+    else:
+        raise ValueError("Invalid file_type %s"%file_type)
+
+def read_yaml_file(file_name):
+    import yaml
+    with open(file_name) as fin:
+        config = yaml.load(fin.read())
+    return config
+
+def read_json_file(file_name):
+    import json
+    with open(file_name) as fin:
+        config = json.load(fin)
+    return config
+
+def read_params_file(file_name):
     config = dict()
     with open(file_name) as fin:
         for v in fin:
@@ -138,7 +180,7 @@ def setup_logger(verbose, log_file=None):
     logger.setLevel(logging_level)
     return logger
 
- 
+
 def check_config(config, params, aliases=None, logger=None):
     """Check (and update) a config dict to conform to the given parameter rules.
     The params dict has an entry for each valid config parameter whose value is a tuple
@@ -173,15 +215,21 @@ def check_config(config, params, aliases=None, logger=None):
 
         # Check that this is a valid key
         if key not in params:
-            raise AttributeError("Invalid parameter %s found in config dict."%key)
+            raise AttributeError("Invalid parameter %s."%key)
 
         value_type, may_be_list, default_value, valid_values = params[key][:4]
 
         # Get the value
-        if value_type is bool:
-            value = parse_bool(config[key])
+        if may_be_list and isinstance(config[key], list):
+            if value_type is bool:
+                value = [ parse_bool(v) for v in config[key] ]
+            else:
+                value = [ value_type(v) for v in config[key] ]
         else:
-            value = value_type(config[key])
+            if value_type is bool:
+                value = parse_bool(config[key])
+            else:
+                value = value_type(config[key])
 
         # If limited allowed values, check that this is one of them.
         if valid_values is not None:
@@ -210,7 +258,7 @@ def check_config(config, params, aliases=None, logger=None):
     return config
 
 
-def print_params(params):
+def print_params(params): # pragma: no cover
     """Print the information about the valid parameters, given by the given params dict.
     See check_config for the structure of the params dict.
 
@@ -220,30 +268,30 @@ def print_params(params):
     for key in params:
         value_type, may_be_list, default_value, valid_values = params[key][:4]
         description = params[key][4:]
-        print ("{0:<"+str(max_len)+"} {1}").format(key,description[0])
+        print(("{0:<"+str(max_len)+"} {1}").format(key,description[0]))
         for d in description[1:]:
-            print "                {0}".format(d)
+            print("                {0}".format(d))
 
         # str(value_type) looks like "<type 'float'>"
         # value_type.__name__ looks like 'float'
         if may_be_list:
-            print "                Type must be {0} or a list of {0}.".format(value_type.__name__)
+            print("                Type must be {0} or a list of {0}.".format(value_type.__name__))
         else:
-            print "                Type must be {0}.".format(value_type.__name__)
+            print("                Type must be {0}.".format(value_type.__name__))
 
         if valid_values is not None:
-            print "                Valid values are {0!s}".format(valid_values)
+            print("                Valid values are {0!s}".format(valid_values))
         if default_value is not None:
-            print "                Default value is {0!s}".format(default_value)
-        print
+            print("                Default value is {0!s}".format(default_value))
+        print()
 
 
 def convert(value, value_type, key):
     """Convert the given value to the given type.
-    
+
     The key helps determine what kind of conversion should be performed.
     Specifically if 'unit' is in the key value, then a unit conversion is done.
-    Otherwise, it just parses 
+    Otherwise, it just parses
 
     :param value:       The input value to be converted.  Usually a string.
     :param value_type:  The type to convert to.
@@ -261,8 +309,8 @@ def convert(value, value_type, key):
 def get_from_list(config, key, num, value_type=str, default=None):
     """A helper function to get a key from config that is allowed to be a list
 
-    Some of the config values are allowed to be lists of values, in which case we take the 
-    `num` item from the list.  If they are not a list, then the given value is used for 
+    Some of the config values are allowed to be lists of values, in which case we take the
+    `num` item from the list.  If they are not a list, then the given value is used for
     all values of `num`.
 
     :param config:      The configuration dict from which to get the key value.
@@ -311,39 +359,29 @@ def get(config, key, value_type=str, default=None):
     else:
         return default
 
-def merge_config(config, kwargs):
+def merge_config(config, kwargs, valid_params):
     """Merge in the values from kwargs into config.
 
     If either of these is None, then the other one is returned.
     If they are both dicts, then the values in kwargs take precedence over ones in config
-    if there are any keys that are in both.
+    if there are any keys that are in both.  Also, the kwargs dict will be modified in this case.
 
-    Note: neither input dict will be modified in this process.
+    :param config:          The root config (will not be modified)
+    :param kwargs:          A second dict with more or updated values
+    :param valid_params:    A dict of valid parameters that are allowed for this usage.
+                            The config dict is allowed to have extra items, but kwargs is not.
 
-    :param config:      The root config
-    :param kwargs:      A second dict with more or updated values
-
-    :returns:           The merged dict
+    :returns:               The merged dict, including only items that are in valid_params.
     """
+    if kwargs is None:
+        kwargs = {}
+    if config:
+        for key, value in future.utils.iteritems(config):
+            if key in valid_params and key not in kwargs:
+                kwargs[key] = value
+    check_config(kwargs, valid_params)
+    return kwargs
 
-    if kwargs:
-        if config:
-            import copy
-            config = copy.copy(config)
-            config.update(kwargs)
-        else: 
-            config = kwargs
-    if config is None:
-        config = {}
-    return config
-
-
-import os
-import numpy
-import ctypes
-_treecorr = numpy.ctypeslib.load_library('_treecorr',os.path.dirname(__file__))
-_treecorr.SetOMPThreads.restype = ctypes.c_int
-_treecorr.SetOMPThreads.argtypes = [ ctypes.c_int ]
 
 def set_omp_threads(num_threads, logger=None):
     """Set the number of OpenMP threads to use in the C++ layer.
@@ -356,22 +394,28 @@ def set_omp_threads(num_threads, logger=None):
                         the requested number of threads.
     """
     input_num_threads = num_threads  # Save the input value.
+
+    # If num_threads is auto, get it from cpu_count
     if num_threads is None or num_threads <= 0:
         import multiprocessing
         num_threads = multiprocessing.cpu_count()
         if logger:
             logger.debug('multiprocessing.cpu_count() = %d',num_threads)
-    if num_threads > 1:
-        if logger:
-            logger.debug('Telling OpenMP to use %d threads',num_threads)
-        num_threads = _treecorr.SetOMPThreads(num_threads)
-        if logger:
-            logger.debug('OpenMP reports that it will use %d threads',num_threads)
-            if num_threads > 1:
-                logger.info('Using %d threads.',num_threads)
-            elif input_num_threads != 1:
-                # Only warn if the user specifically asked for num_threads != 1.
-                logger.warn('Unable to use multiple threads, since OpenMP is not enabled.')
+
+    # Tell OpenMP to use this many threads
+    if logger:
+        logger.debug('Telling OpenMP to use %d threads',num_threads)
+    num_threads = treecorr._lib.SetOMPThreads(num_threads)
+
+    # Report back appropriately.
+    if logger: # pragma: no cover
+        logger.debug('OpenMP reports that it will use %d threads',num_threads)
+        if num_threads > 1:
+            logger.info('Using %d threads.',num_threads)
+        elif input_num_threads is not None and input_num_threads != 1:
+            # Only warn if the user specifically asked for num_threads != 1.
+            logger.warn('Unable to use multiple threads, since OpenMP is not enabled.')
+
     return num_threads
 
 

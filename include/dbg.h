@@ -1,4 +1,4 @@
-/* Copyright (c) 2003-2014 by Mike Jarvis
+/* Copyright (c) 2003-2015 by Mike Jarvis
  *
  * TreeCorr is free software: redistribution and use in source and binary forms,
  * with or without modification, are permitted provided that the following
@@ -11,10 +11,9 @@
  *    this list of conditions, and the disclaimer given in the documentation
  *    and/or other materials provided with the distribution.
  */
-//---------------------------------------------------------------------------
-#ifndef dbgH
-#define dbgH
-//---------------------------------------------------------------------------
+
+#ifndef TreeCorr_dbg_H
+#define TreeCorr_dbg_H
 
 /* Put the following in the main program file:
 

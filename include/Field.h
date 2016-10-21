@@ -1,4 +1,4 @@
-/* Copyright (c) 2003-2014 by Mike Jarvis
+/* Copyright (c) 2003-2015 by Mike Jarvis
  *
  * TreeCorr is free software: redistribution and use in source and binary forms,
  * with or without modification, are permitted provided that the following
@@ -12,119 +12,66 @@
  *    and/or other materials provided with the distribution.
  */
 
+#ifndef TreeCorr_Field_H
+#define TreeCorr_Field_H
+
 #include "Cell.h"
 
-// The C++ class
-template <int DC, int M>
+// Most of the functionality for building Cells and doing the correlation functions is the
+// same regardless of which kind of Cell we have (N, K, G) or which kind of positions we
+// are using (Flat, ThreeD, Sphere), or what metric we use for the distances between points
+// (Euclidean, Perp, Arc).  So most of the C++ code uses templates.
+//
+// D = NData for counts
+//     KData for kappa
+//     GData for shear
+//
+// C = Flat for (x,y) coordinates
+//     ThreeD for (x,y,z) coordinates
+//     Sphere for spherical coordinates
+//
+// M = Euclidean for Euclidean distances in either (x,y) or (x,y,z)
+//     Perp for the perpendicular component of the 3D distance
+//     Arc for great circle distances on the sphere
+
+template <int D, int C>
 class Field
 {
 public:
-    // Note: for M=Sphere, x,y here are really ra,dec.
-    Field(double* x, double* y, double* r, double* g1, double* g2, double* k, double* w,
-          long nobj, double minsep, double maxsep, double b, int sm_int);
+    Field(double* x, double* y, double* z, double* g1, double* g2, double* k,
+          double* w, double* wpos, long nobj,
+          double minsize, double maxsize,
+          int sm_int, int maxtop);
     ~Field();
 
     long getNObj() const { return _nobj; }
     long getNTopLevel() const { return long(_cells.size()); }
-    const std::vector<Cell<DC,M>*>& getCells() const { return _cells; }
+    const std::vector<Cell<D,C>*>& getCells() const { return _cells; }
 
 private:
 
     long _nobj;
-    double _minsep;
-    double _maxsep;
-    double _b;
+    double _minsize;
+    double _maxsize;
     SplitMethod _sm;
-    std::vector<Cell<DC,M>*> _cells;
+    std::vector<Cell<D,C>*> _cells;
 };
 
 // A SimpleField just stores the celldata.  It doesn't go on to build up the Cells.
 // It is used by processPairwise.
-template <int DC, int M>
+template <int D, int C>
 class SimpleField
 {
 public:
-    SimpleField(double* x, double* y, double* r, double* g1, double* g2, double* k, double* w,
-                long nobj);
+    SimpleField(double* x, double* y, double* z, double* g1, double* g2, double* k,
+                double* w, double* wpos, long nobj);
     ~SimpleField();
 
     long getNObj() const { return long(_cells.size()); }
-    const std::vector<Cell<DC,M>*>& getCells() const { return _cells; }
+    const std::vector<Cell<D,C>*>& getCells() const { return _cells; }
 
 private:
-    std::vector<Cell<DC,M>*> _cells;
+    std::vector<Cell<D,C>*> _cells;
 };
 
-// The C interface for python
-extern "C" {
-
-    extern void* BuildGFieldFlat(double* x, double* y, double* g1, double* g2, double* w,
-                                 long nobj, double minsep, double maxsep, double b, int sm_int);
-
-    extern void* BuildGFieldSphere(double* ra, double* dec, double* r,
-                                   double* g1, double* g2, double* w,
-                                   long nobj, double minsep, double maxsep, double b, int sm_int);
-
-    extern void* BuildKFieldFlat(double* x, double* y, double* k, double* w,
-                                 long nobj, double minsep, double maxsep, double b, int sm_int);
-
-    extern void* BuildKFieldSphere(double* ra, double* dec, double* r, double* k, double* w,
-                                   long nobj, double minsep, double maxsep, double b, int sm_int);
-
-    extern void* BuildNFieldFlat(double* x, double* y, double* w,
-                                 long nobj, double minsep, double maxsep, double b, int sm_int);
-
-    extern void* BuildNFieldSphere(double* ra, double* dec, double* r, double* w,
-                                   long nobj, double minsep, double maxsep, double b, int sm_int);
-
-    extern void DestroyGFieldFlat(void* field);
-
-    extern void DestroyGFieldSphere(void* field);
-
-    extern void DestroyKFieldFlat(void* field);
-
-    extern void DestroyKFieldSphere(void* field);
-
-    extern void DestroyNFieldFlat(void* field);
-
-    extern void DestroyNFieldSphere(void* field);
-
-
-
-    extern void* BuildGSimpleFieldFlat(double* x, double* y,
-                                       double* g1, double* g2, double* w, long nobj);
-
-    extern void* BuildGSimpleFieldSphere(double* ra, double* dec, double* r,
-                                         double* g1, double* g2, double* w, long nobj);
-
-    extern void* BuildGSimpleFieldFlat(double* x, double* y,
-                                       double* g1, double* g2, double* w, long nobj);
-
-    extern void* BuildGSimpleFieldSphere(double* ra, double* dec, double* r,
-                                         double* g1, double* g2, double* w, long nobj);
-
-    extern void* BuildKSimpleFieldFlat(double* x, double* y,
-                                       double* k, double* w, long nobj);
-
-    extern void* BuildKSimpleFieldSphere(double* ra, double* dec, double* r,
-                                         double* k, double* w, long nobj);
-
-    extern void* BuildNSimpleFieldFlat(double* x, double* y, double* w, long nobj);
-
-    extern void* BuildNSimpleFieldSphere(double* ra, double* dec, double* r, double* w, long nobj);
-
-    extern void DestroyGSimpleFieldFlat(void* field);
-
-    extern void DestroyGSimpleFieldSphere(void* field);
-
-    extern void DestroyKSimpleFieldFlat(void* field);
-
-    extern void DestroyKSimpleFieldSphere(void* field);
-
-    extern void DestroyNSimpleFieldFlat(void* field);
-
-    extern void DestroyNSimpleFieldSphere(void* field);
-
-
-}
-
+#endif
